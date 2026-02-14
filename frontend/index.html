@@ -163,8 +163,7 @@
     <div class="title">
       <h1>Robot Bending ML (Desired Angle → Tool Settings)</h1>
       <div class="sub">
-        Frontend calls your local <span class="mono">FastAPI</span> endpoint <span class="mono">POST /predict</span>.
-        Run backend on <span class="mono">127.0.0.1:8000</span> and serve this page with a local web server.
+        Frontend calls your <span class="mono">FastAPI</span> endpoint <span class="mono">POST /predict</span>.
       </div>
     </div>
     <div class="badge"><span class="dot"></span> Backend ML API • Option 1</div>
@@ -194,9 +193,7 @@
 
       <div class="errorBox" id="errorBox">
         <b>Backend not reachable.</b><br/>
-        1) Start backend: <span class="mono">uvicorn app:app --reload --port 8000</span><br/>
-        2) Open API docs: <span class="mono">http://127.0.0.1:8000/docs</span><br/>
-        3) Serve frontend: <span class="mono">python -m http.server 5500</span> (inside frontend folder)
+        Check that the API URL is correct and backend is live.
       </div>
 
       <div class="kpi">
@@ -211,9 +208,9 @@
           <div class="hint">Predicted by backend</div>
         </div>
         <div class="box">
-          <div class="name">Abs error (deg)</div>
+          <div class="name">Springback (deg)</div>
           <div class="val mono" id="outErr">—</div>
-          <div class="hint">|achieved − desired|</div>
+          <div class="hint">achieved − desired</div>
         </div>
       </div>
 
@@ -244,7 +241,7 @@
       </div>
 
       <div class="small">
-        If your backend runs on a different port, change <span class="mono">API_BASE</span> in the script.
+        If your backend runs on a different URL, change <span class="mono">API_BASE</span> in the script.
       </div>
     </section>
 
@@ -257,8 +254,8 @@
 </div>
 
 <script>
-  // Change this if your backend is not on 8000
-const API_BASE = "https://robot-bending-ml.onrender.com";
+  // Production API
+  const API_BASE = "https://robot-bending-ml.onrender.com";
   document.getElementById("apiLabel").textContent = API_BASE;
 
   // Same dataset for plotting only
@@ -311,7 +308,7 @@ const API_BASE = "https://robot-bending-ml.onrender.com";
 
   const outRyr = document.getElementById('outRyr');
   const outAch = document.getElementById('outAch');
-  const outErr = document.getElementById('outErr');
+  const outErr = document.getElementById('outErr'); // now used for springback display
 
   const rxEl  = document.getElementById('rx');
   const ryEl  = document.getElementById('ry');
@@ -324,7 +321,8 @@ const API_BASE = "https://robot-bending-ml.onrender.com";
   const chipZone = document.getElementById('chipZone');
   const chipNote = document.getElementById('chipNote');
 
-  function setChips(desired, achieved, err){
+  // keep chip logic based on absolute error magnitude (for warnings)
+  function setChips(desired, achieved, absErr){
     const angles = data.map(d=>d.angle);
     const minAng = Math.min(...angles);
     const maxAng = Math.max(...angles);
@@ -340,7 +338,7 @@ const API_BASE = "https://robot-bending-ml.onrender.com";
     let note = 'Stable forward + search inversion';
     let cls = 'ok';
     if(desired >= 78){ note = 'Non-unique region (many ryr give similar angles)'; cls='warn'; }
-    if(!feasible){ note = `Target not covered; best possible shown (error ≈ ${err.toFixed(2)}°)`; cls='bad'; }
+    if(!feasible){ note = `Target not covered; best possible shown (abs error ≈ ${absErr.toFixed(2)}°)`; cls='bad'; }
     chipNote.className = 'chip ' + cls + ' mono';
     chipNote.textContent = `Note: ${note}`;
   }
@@ -443,9 +441,13 @@ const API_BASE = "https://robot-bending-ml.onrender.com";
       errorBox.style.display = "none";
       const out = await computeFromServer(desired);
 
+      const achieved = Number(out.achieved_angle_deg);
+      const springback = achieved - desired;      // ✅ springback (signed)
+      const absErr = Math.abs(springback);        // keep this for chip warnings
+
       outRyr.textContent = Number(out.ryr_rad).toFixed(4);
-      outAch.textContent = Number(out.achieved_angle_deg).toFixed(2);
-      outErr.textContent = Number(out.abs_error_deg).toFixed(2);
+      outAch.textContent = achieved.toFixed(2);
+      outErr.textContent = springback.toFixed(2); // ✅ display springback
 
       rxEl.textContent  = Number(out.rx_mm).toFixed(3);
       ryEl.textContent  = Number(out.ry_mm).toFixed(3);
@@ -454,7 +456,7 @@ const API_BASE = "https://robot-bending-ml.onrender.com";
       ryrEl.textContent = Number(out.ryr_rad).toFixed(4);
       rzrEl.textContent = Number(out.rzr_rad).toFixed(3);
 
-      setChips(desired, Number(out.achieved_angle_deg), Number(out.abs_error_deg));
+      setChips(desired, achieved, absErr);
       drawPlot(desired, Number(out.ryr_rad));
     }catch(e){
       errorBox.style.display = "block";
@@ -484,7 +486,7 @@ Tool settings:
   ryr = ${ryrEl.textContent} rad
   rzr = ${rzrEl.textContent} rad
 Achieved angle (deg): ${outAch.textContent}
-Abs error (deg): ${outErr.textContent}`;
+Springback (deg): ${outErr.textContent}`;
     try{
       await navigator.clipboard.writeText(text);
       const btn = document.getElementById('btnCopy');

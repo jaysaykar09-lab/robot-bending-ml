@@ -12,7 +12,7 @@ app = FastAPI(title="Robot Bending ML API", version="1.0")
 # Allow browser frontend to call this API (local demo).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://YOUR-NETLIFY-SITE.netlify.app"]  # OK for local testing; restrict for production
+    allow_origins=["https://YOUR-NETLIFY-SITE.netlify.app"],  # restrict for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

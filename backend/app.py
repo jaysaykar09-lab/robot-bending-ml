@@ -81,7 +81,7 @@ def invert_desired_angle(desired_angle_deg: float, steps: int = 4000):
     idx = int(np.argmin(np.abs(pred_angles - desired_angle_deg)))
     best_ryr = float(grid[idx][0])
     achieved = float(pred_angles[idx])
-    err = abs(achieved - desired_angle_deg)
+    springback = achieved - desired_angle_deg
     return best_ryr, achieved, err
 
 class PredictRequest(BaseModel):
@@ -106,6 +106,6 @@ def predict(req: PredictRequest):
         "ryr_rad": best_ryr,
         "rzr_rad": 0.0,
         "achieved_angle_deg": achieved,
-        "abs_error_deg": err,
+        "springback_deg": springback,
         "ryr_range_rad": [RYR_MIN, RYR_MAX],
     }

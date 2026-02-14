@@ -1,25 +1,506 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>Robot Bending ML</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robot Bending ML — Desired Angle → Tool Settings</title>
+  <style>
+    :root{
+      --bg1:#0b1020; --bg2:#111a3a; --card:#0f1733cc;
+      --txt:#e9ecff; --muted:#aeb6e6;
+      --accent:#7c5cff; --accent2:#20d3ff; --ok:#42f59b;
+      --warn:#ffcf5a; --bad:#ff5c7c;
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:var(--txt);
+      background:
+        radial-gradient(1100px 700px at 10% 10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(900px 600px at 90% 20%, rgba(32,211,255,.25), transparent 60%),
+        radial-gradient(900px 600px at 50% 100%, rgba(66,245,155,.16), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      min-height:100vh;
+      padding:28px 18px 40px;
+    }
+    .wrap{max-width:1100px;margin:0 auto}
+    header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+    .title{display:flex;flex-direction:column;gap:6px}
+    h1{margin:0;font-size: clamp(20px, 3vw, 30px);letter-spacing:.2px;line-height:1.1}
+    .sub{color:var(--muted);font-size:14px;line-height:1.35;max-width:760px}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.06);
+      padding:10px 12px;border-radius:999px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      color:var(--muted);font-size:13px;user-select:none;white-space:nowrap;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 18px rgba(124,92,255,.6);
+    }
+    .grid{display:grid;grid-template-columns: 1.05fr .95fr;gap:16px}
+    @media (max-width: 960px){ .grid{grid-template-columns:1fr} }
+
+    .card{
+      background: var(--card);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding:16px;
+      overflow:hidden;
+      position:relative;
+    }
+    .card:before{
+      content:"";
+      position:absolute;inset:-1px;
+      background: linear-gradient(135deg, rgba(124,92,255,.22), rgba(32,211,255,.14), rgba(66,245,155,.10));
+      opacity:.35; filter: blur(14px); z-index:-1;
+    }
+    .card h2{margin:0 0 10px 0;font-size:16px;color:#f2f4ff;letter-spacing:.2px}
+    .row{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+    @media (max-width: 560px){ .row{grid-template-columns:1fr} }
+
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
+    .input{
+      width:100%;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(8,12,28,.55);
+      color: var(--txt);
+      border-radius: 14px;
+      padding:12px 12px;
+      outline:none;
+      transition:.18s ease;
+    }
+    .input:focus{border-color: rgba(124,92,255,.65);box-shadow: 0 0 0 3px rgba(124,92,255,.18)}
+    .range{width:100%;accent-color: var(--accent)}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    button{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(124,92,255,.18);
+      color: var(--txt);
+      padding:11px 12px;
+      border-radius: 14px;
+      cursor:pointer;
+      transition:.15s ease;
+      font-weight:600;
+      letter-spacing:.2px;
+    }
+    button:hover{transform: translateY(-1px); border-color: rgba(124,92,255,.55)}
+    .btn2{background: rgba(32,211,255,.12)}
+    .btn3{background: rgba(66,245,155,.10)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+
+    .kpi{display:grid;grid-template-columns: 1fr 1fr 1fr;gap:10px;margin-top:10px}
+    @media (max-width: 560px){ .kpi{grid-template-columns:1fr} }
+    .kpi .box{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(8,12,28,.45);
+      border-radius: 16px;
+      padding:12px;
+    }
+    .kpi .name{color:var(--muted);font-size:12px;margin-bottom:6px}
+    .kpi .val{font-size:18px;font-weight:700}
+    .kpi .hint{color:var(--muted);font-size:12px;margin-top:6px}
+
+    .status{
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+      margin-top:12px;padding:12px;border-radius: 16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(8,12,28,.35);
+    }
+    .chip{
+      padding:6px 10px;border-radius:999px;font-size:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .chip.ok{border-color: rgba(66,245,155,.35); color: rgba(66,245,155,.95)}
+    .chip.warn{border-color: rgba(255,207,90,.35); color: rgba(255,207,90,.95)}
+    .chip.bad{border-color: rgba(255,92,124,.35); color: rgba(255,92,124,.95)}
+
+    .tableWrap{margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden}
+    table{width:100%;border-collapse:collapse;font-size:13px;background: rgba(8,12,28,.35)}
+    th,td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;color: var(--txt)}
+    th{color:var(--muted);font-weight:600}
+    tr:last-child td{border-bottom:none}
+    .right{text-align:right}
+
+    canvas{
+      width:100%;
+      height:320px;
+      background: rgba(8,12,28,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      display:block;
+    }
+
+    .errorBox{
+      display:none;
+      margin-top:12px;
+      padding:12px;
+      border-radius:16px;
+      border:1px solid rgba(255,92,124,.35);
+      background: rgba(255,92,124,.10);
+      color: rgba(255,92,124,.95);
+      font-size:13px;
+      line-height:1.35;
+    }
+    .small{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.35}
+  </style>
 </head>
+
 <body>
-<h2>Desired Bend Angle</h2>
-<input id="angle" type="number" value="60"/>
-<button onclick="run()">Predict</button>
-<pre id="out"></pre>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <h1>Robot Bending ML (Desired Angle → Tool Settings)</h1>
+      <div class="sub">
+        Frontend calls your local <span class="mono">FastAPI</span> endpoint <span class="mono">POST /predict</span>.
+        Run backend on <span class="mono">127.0.0.1:8000</span> and serve this page with a local web server.
+      </div>
+    </div>
+    <div class="badge"><span class="dot"></span> Backend ML API • Option 1</div>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Inputs</h2>
+
+      <div class="row">
+        <div>
+          <label for="angleNum">Desired bend angle (deg)</label>
+          <input id="angleNum" class="input" type="number" step="0.1" value="60" min="0" max="90" />
+        </div>
+        <div>
+          <label for="angleRange">Quick slider</label>
+          <input id="angleRange" class="range" type="range" value="60" min="0" max="90" step="0.1" />
+          <div class="small">API base: <span class="mono" id="apiLabel"></span></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnCompute">Compute</button>
+        <button id="btnCopy" class="btn2">Copy results</button>
+        <button id="btnReset" class="btn3">Reset</button>
+      </div>
+
+      <div class="errorBox" id="errorBox">
+        <b>Backend not reachable.</b><br/>
+        1) Start backend: <span class="mono">uvicorn app:app --reload --port 8000</span><br/>
+        2) Open API docs: <span class="mono">http://127.0.0.1:8000/docs</span><br/>
+        3) Serve frontend: <span class="mono">python -m http.server 5500</span> (inside frontend folder)
+      </div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="name">Recommended ryr (rad)</div>
+          <div class="val mono" id="outRyr">—</div>
+          <div class="hint">Main control from your data</div>
+        </div>
+        <div class="box">
+          <div class="name">Achieved angle (deg)</div>
+          <div class="val mono" id="outAch">—</div>
+          <div class="hint">Predicted by backend</div>
+        </div>
+        <div class="box">
+          <div class="name">Abs error (deg)</div>
+          <div class="val mono" id="outErr">—</div>
+          <div class="hint">|achieved − desired|</div>
+        </div>
+      </div>
+
+      <div class="status">
+        <span class="chip" id="chipFeas">Feasibility: —</span>
+        <span class="chip" id="chipZone">Region: —</span>
+        <span class="chip mono" id="chipNote">Note: —</span>
+      </div>
+
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Output parameter</th>
+              <th class="right">Value</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">rx</td><td class="right mono" id="rx">—</td><td>mm</td></tr>
+            <tr><td class="mono">ry</td><td class="right mono" id="ry">—</td><td>mm</td></tr>
+            <tr><td class="mono">rz</td><td class="right mono" id="rz">—</td><td>mm</td></tr>
+            <tr><td class="mono">rxr</td><td class="right mono" id="rxr">—</td><td>rad</td></tr>
+            <tr><td class="mono">ryr</td><td class="right mono" id="ryr">—</td><td>rad</td></tr>
+            <tr><td class="mono">rzr</td><td class="right mono" id="rzr">—</td><td>rad</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="small">
+        If your backend runs on a different port, change <span class="mono">API_BASE</span> in the script.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Visualization (dataset curve + chosen ryr)</h2>
+      <canvas id="plot" width="900" height="520"></canvas>
+      <div class="small">This plot is only for visualization; values come from backend response.</div>
+    </section>
+  </div>
+</div>
 
 <script>
-async function run(){
-  const angle = parseFloat(document.getElementById("angle").value);
-  const res = await fetch("http://127.0.0.1:8000/predict", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({desired_angle:angle})
+  // Change this if your backend is not on 8000
+  const API_BASE = "http://127.0.0.1:8000";
+  document.getElementById("apiLabel").textContent = API_BASE;
+
+  // Same dataset for plotting only
+  const data = [
+    { ryr:1.00, angle:61.20 },{ ryr:1.20, angle:80.34 },{ ryr:1.40, angle:82.10 },
+    { ryr:0.60, angle:31.63 },{ ryr:0.65, angle:35.14 },{ ryr:0.70, angle:40.47 },
+    { ryr:0.75, angle:44.86 },{ ryr:0.80, angle:48.35 },{ ryr:0.85, angle:50.79 },
+    { ryr:0.90, angle:53.11 },{ ryr:0.95, angle:56.60 },{ ryr:1.05, angle:66.95 },
+    { ryr:1.10, angle:69.81 },{ ryr:1.15, angle:75.26 },{ ryr:1.25, angle:80.86 },
+    { ryr:1.30, angle:81.98 },{ ryr:1.35, angle:81.80 },{ ryr:1.45, angle:82.12 },
+    { ryr:1.50, angle:82.08 },{ ryr:1.55, angle:81.45 },{ ryr:1.60, angle:81.68 },
+    { ryr:1.65, angle:81.69 },{ ryr:1.70, angle:81.43 },{ ryr:1.75, angle:81.51 },
+    { ryr:1.80, angle:81.68 },{ ryr:1.85, angle:81.75 },{ ryr:1.90, angle:81.97 },
+    { ryr:1.95, angle:82.09 },{ ryr:2.00, angle:82.10 },{ ryr:2.05, angle:82.11 },
+    { ryr:2.10, angle:82.12 },{ ryr:2.15, angle:82.12 },{ ryr:2.20, angle:82.13 },
+  ].sort((a,b)=>a.ryr-b.ryr);
+
+  const ryrMin = data[0].ryr;
+  const ryrMax = data[data.length-1].ryr;
+  function clamp(x, lo, hi){ return Math.max(lo, Math.min(hi, x)); }
+
+  function angleFromRyr(ryr){
+    ryr = clamp(ryr, ryrMin, ryrMax);
+    for(let i=0;i<data.length-1;i++){
+      const a = data[i], b = data[i+1];
+      if(ryr >= a.ryr && ryr <= b.ryr){
+        const t = (ryr - a.ryr) / (b.ryr - a.ryr || 1);
+        return a.angle + t*(b.angle-a.angle);
+      }
+    }
+    return data[data.length-1].angle;
+  }
+
+  async function computeFromServer(desired){
+    const res = await fetch(`${API_BASE}/predict`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ desired_angle: desired })
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(()=>"(no details)");
+      throw new Error(`API error ${res.status}: ${txt}`);
+    }
+    return await res.json();
+  }
+
+  const angleNum = document.getElementById('angleNum');
+  const angleRange = document.getElementById('angleRange');
+  const errorBox = document.getElementById('errorBox');
+
+  const outRyr = document.getElementById('outRyr');
+  const outAch = document.getElementById('outAch');
+  const outErr = document.getElementById('outErr');
+
+  const rxEl  = document.getElementById('rx');
+  const ryEl  = document.getElementById('ry');
+  const rzEl  = document.getElementById('rz');
+  const rxrEl = document.getElementById('rxr');
+  const ryrEl = document.getElementById('ryr');
+  const rzrEl = document.getElementById('rzr');
+
+  const chipFeas = document.getElementById('chipFeas');
+  const chipZone = document.getElementById('chipZone');
+  const chipNote = document.getElementById('chipNote');
+
+  function setChips(desired, achieved, err){
+    const angles = data.map(d=>d.angle);
+    const minAng = Math.min(...angles);
+    const maxAng = Math.max(...angles);
+    const feasible = (desired >= minAng && desired <= maxAng);
+
+    chipFeas.className = 'chip ' + (feasible ? 'ok' : 'bad');
+    chipFeas.textContent = `Feasibility: ${feasible ? 'within dataset range' : 'outside dataset range'}`;
+
+    const zone = desired >= 78 ? 'Saturation zone (~80–82°)' : (desired >= 45 ? 'Mid region' : 'Low region');
+    chipZone.className = 'chip ' + (desired >= 78 ? 'warn' : 'ok');
+    chipZone.textContent = `Region: ${zone}`;
+
+    let note = 'Stable forward + search inversion';
+    let cls = 'ok';
+    if(desired >= 78){ note = 'Non-unique region (many ryr give similar angles)'; cls='warn'; }
+    if(!feasible){ note = `Target not covered; best possible shown (error ≈ ${err.toFixed(2)}°)`; cls='bad'; }
+    chipNote.className = 'chip ' + cls + ' mono';
+    chipNote.textContent = `Note: ${note}`;
+  }
+
+  // ---- Plot (canvas) ----
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
+
+  function drawPlot(desiredAngle, chosenRyr){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+
+    const pad = 50 * dpr;
+    const left = pad, right = w - pad, top = 24*dpr, bottom = h - pad;
+
+    const angles = data.map(d=>d.angle);
+    const minY = Math.min(...angles) - 2;
+    const maxY = Math.max(...angles) + 2;
+    const minX = ryrMin, maxX = ryrMax;
+
+    const xScale = x => left + (x - minX) * (right-left) / (maxX-minX);
+    const yScale = y => bottom - (y - minY) * (bottom-top) / (maxY-minY);
+
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = 'rgba(8,12,28,0.35)';
+    ctx.fillRect(0,0,w,h);
+
+    // grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1*dpr;
+    for(let i=0;i<=5;i++){
+      const y = top + i*(bottom-top)/5;
+      ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(right,y); ctx.stroke();
+    }
+    for(let i=0;i<=6;i++){
+      const x = left + i*(right-left)/6;
+      ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,bottom); ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1.2*dpr;
+    ctx.beginPath(); ctx.moveTo(left,top); ctx.lineTo(left,bottom); ctx.lineTo(right,bottom); ctx.stroke();
+
+    // labels
+    ctx.fillStyle = 'rgba(233,236,255,0.75)';
+    ctx.font = `${12*dpr}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    ctx.fillText('ryr (rad)', right - 80*dpr, bottom + 32*dpr);
+    ctx.save(); ctx.translate(18*dpr, (top+bottom)/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText('final angle (deg)', 0,0); ctx.restore();
+
+    // curve
+    ctx.strokeStyle = 'rgba(124,92,255,0.65)';
+    ctx.lineWidth = 2*dpr;
+    ctx.beginPath();
+    for(let i=0;i<=800;i++){
+      const r = minX + (maxX-minX)*i/800;
+      const a = angleFromRyr(r);
+      const x = xScale(r), y = yScale(a);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // points
+    for(const p of data){
+      const x = xScale(p.ryr), y = yScale(p.angle);
+      ctx.fillStyle = 'rgba(32,211,255,0.85)';
+      ctx.beginPath(); ctx.arc(x,y,3.2*dpr,0,Math.PI*2); ctx.fill();
+    }
+
+    // desired horizontal line
+    ctx.strokeStyle = 'rgba(255,207,90,0.35)';
+    ctx.lineWidth = 2*dpr;
+    const yD = yScale(desiredAngle);
+    ctx.beginPath(); ctx.moveTo(left,yD); ctx.lineTo(right,yD); ctx.stroke();
+
+    if(chosenRyr !== null && isFinite(chosenRyr)){
+      // chosen vertical line
+      ctx.strokeStyle = 'rgba(66,245,155,0.45)';
+      ctx.lineWidth = 2*dpr;
+      const xC = xScale(chosenRyr);
+      ctx.beginPath(); ctx.moveTo(xC,top); ctx.lineTo(xC,bottom); ctx.stroke();
+
+      // chosen point
+      const ach = angleFromRyr(chosenRyr);
+      ctx.fillStyle = 'rgba(66,245,155,0.95)';
+      ctx.beginPath(); ctx.arc(xC, yScale(ach), 5.2*dpr, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  async function compute(){
+    const desired = clamp(parseFloat(angleNum.value || "0"), 0, 90);
+    angleNum.value = desired;
+    angleRange.value = desired;
+
+    try{
+      errorBox.style.display = "none";
+      const out = await computeFromServer(desired);
+
+      outRyr.textContent = Number(out.ryr_rad).toFixed(4);
+      outAch.textContent = Number(out.achieved_angle_deg).toFixed(2);
+      outErr.textContent = Number(out.abs_error_deg).toFixed(2);
+
+      rxEl.textContent  = Number(out.rx_mm).toFixed(3);
+      ryEl.textContent  = Number(out.ry_mm).toFixed(3);
+      rzEl.textContent  = Number(out.rz_mm).toFixed(3);
+      rxrEl.textContent = Number(out.rxr_rad).toFixed(3);
+      ryrEl.textContent = Number(out.ryr_rad).toFixed(4);
+      rzrEl.textContent = Number(out.rzr_rad).toFixed(3);
+
+      setChips(desired, Number(out.achieved_angle_deg), Number(out.abs_error_deg));
+      drawPlot(desired, Number(out.ryr_rad));
+    }catch(e){
+      errorBox.style.display = "block";
+      outRyr.textContent = outAch.textContent = outErr.textContent = "—";
+      rxEl.textContent = ryEl.textContent = rzEl.textContent = "—";
+      rxrEl.textContent = ryrEl.textContent = rzrEl.textContent = "—";
+      chipFeas.textContent = "Feasibility: —";
+      chipZone.textContent = "Region: —";
+      chipNote.textContent = "Note: —";
+      drawPlot(desired, null);
+      console.error(e);
+    }
+  }
+
+  document.getElementById('btnCompute').addEventListener('click', compute);
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    angleNum.value = 60; angleRange.value = 60; compute();
   });
-  document.getElementById("out").textContent =
-    JSON.stringify(await res.json(), null, 2);
-}
+  document.getElementById('btnCopy').addEventListener('click', async ()=>{
+    const text =
+`Desired angle (deg): ${parseFloat(angleNum.value).toFixed(2)}
+Tool settings:
+  rx  = ${rxEl.textContent} mm
+  ry  = ${ryEl.textContent} mm
+  rz  = ${rzEl.textContent} mm
+  rxr = ${rxrEl.textContent} rad
+  ryr = ${ryrEl.textContent} rad
+  rzr = ${rzrEl.textContent} rad
+Achieved angle (deg): ${outAch.textContent}
+Abs error (deg): ${outErr.textContent}`;
+    try{
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('btnCopy');
+      btn.textContent = "Copied ✅";
+      setTimeout(()=>btn.textContent="Copy results", 1200);
+    }catch{
+      alert("Copy failed (clipboard blocked).");
+    }
+  });
+
+  angleNum.addEventListener('input', compute);
+  angleRange.addEventListener('input', ()=>{ angleNum.value = angleRange.value; compute(); });
+  window.addEventListener('resize', compute);
+
+  // first run
+  compute();
 </script>
 </body>
 </html>

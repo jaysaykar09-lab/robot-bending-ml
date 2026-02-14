@@ -9,19 +9,15 @@ from sklearn.ensemble import RandomForestRegressor
 
 app = FastAPI(title="Robot Bending ML API", version="1.0")
 
-# ✅ CORS (temporary open for testing; lock to your Netlify URL later)
+# ✅ CORS (lock to your Netlify site)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,   # must be False when allow_origins=["*"]
+    allow_origins=["https://gleeful-scone-6f5984.netlify.app"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------------
-# Embedded dataset (your CSV)
-# Forward model: ryr_rad -> final_angle_deg
-# -----------------------------
 CSV_DATA = """Run ID,rx (mm),ry (mm),rz (mm),rxr (rad),ryr (rad),rzr (rad),Final Angle ? (deg),Radius
 0,0,0,0,0,1.0,0,61.2,9.1
 1,0,0,0,0,1.2,0,80.34,8.95
@@ -58,55 +54,41 @@ CSV_DATA = """Run ID,rx (mm),ry (mm),rz (mm),rxr (rad),ryr (rad),rzr (rad),Final
 32,0,0,0,0,2.2,0,82.13,6.61
 """
 
-# ---- Load + prepare data safely ----
 df = pd.read_csv(StringIO(CSV_DATA))
 df.columns = [c.strip() for c in df.columns]
 df = df.rename(columns={"ryr (rad)": "ryr_rad", "Final Angle ? (deg)": "final_angle_deg"})
-
 df["ryr_rad"] = pd.to_numeric(df["ryr_rad"], errors="coerce")
 df["final_angle_deg"] = pd.to_numeric(df["final_angle_deg"], errors="coerce")
 df = df.dropna(subset=["ryr_rad", "final_angle_deg"])
 
-if df.empty:
-    raise ValueError("Dataset empty after cleaning. Check CSV_DATA formatting.")
-
 X = df[["ryr_rad"]]
 y = df["final_angle_deg"]
 
-# ---- Train model ----
 model = RandomForestRegressor(n_estimators=400, max_depth=12, random_state=42)
 model.fit(X, y)
 
 RYR_MIN = float(df["ryr_rad"].min())
 RYR_MAX = float(df["ryr_rad"].max())
 
-
 def invert_desired_angle(desired_angle_deg: float, steps: int = 4000):
-    """
-    Find ryr_rad that makes predicted angle closest to desired (inverse mapping).
-    Uses forward model + grid search.
-    """
     grid = np.linspace(RYR_MIN, RYR_MAX, steps).reshape(-1, 1)
     pred_angles = model.predict(grid)
-
     idx = int(np.argmin(np.abs(pred_angles - desired_angle_deg)))
+
     best_ryr = float(grid[idx][0])
     achieved = float(pred_angles[idx])
 
-    springback = achieved - desired_angle_deg   # signed (achieved - desired)
-    abs_error = abs(springback)                 # magnitude
+    springback = achieved - desired_angle_deg
+    abs_error = abs(springback)
 
     return best_ryr, achieved, springback, abs_error
-
 
 class PredictRequest(BaseModel):
     desired_angle: float
 
-
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Robot Bending ML API running"}
-
 
 @app.post("/predict")
 def predict(req: PredictRequest):

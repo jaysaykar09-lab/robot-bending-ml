@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Robot Bending ML</title>
+</head>
+<body>
+<h2>Desired Bend Angle</h2>
+<input id="angle" type="number" value="60"/>
+<button onclick="run()">Predict</button>
+<pre id="out"></pre>
+
+<script>
+async function run(){
+  const angle = parseFloat(document.getElementById("angle").value);
+  const res = await fetch("http://127.0.0.1:8000/predict", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({desired_angle:angle})
+  });
+  document.getElementById("out").textContent =
+    JSON.stringify(await res.json(), null, 2);
+}
+</script>
+</body>
+</html>
